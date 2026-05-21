@@ -1,8 +1,12 @@
 import math
-from decimal import ROUND_FLOOR, Decimal, getcontext
+from decimal import ROUND_DOWN, ROUND_FLOOR, Decimal, getcontext
+import time
+from tqdm import tqdm
+
+start_zeit = time.perf_counter()
 
 
-iterations = 10000
+iterations = 3000
 getcontext().prec = int(iterations * 1.205) + 20
 r = Decimal(1)
 sn = 0
@@ -26,6 +30,9 @@ nb = Decimal(2) * nb
 sn = (Decimal(2) - nb).sqrt()
 seiten = seiten * Decimal(2)
 
+loop = tqdm(range(iterations), desc="Calculating Pi", unit="iter")
+
+
 
 for i in range(iterations):
     seiten = seiten * Decimal(2)
@@ -46,7 +53,14 @@ for i in range(iterations):
  
 
 pi = sn * tot_iterations
-print("\nFINAL RESULT: ", pi)
+print("\nFINAL RAW RESULT: ", pi)
+
 finale_abweichung = abs(control_pi_decimal - pi)
 korrekte_stellen = -int(finale_abweichung.log10().to_integral_value(rounding=ROUND_FLOOR))
+maske = Decimal('10') ** -korrekte_stellen
+pi_korr = pi.quantize(maske, rounding=ROUND_DOWN)
 print("Korrekte Stellen:", korrekte_stellen)
+print("Korrigiertes Ergebnis:", pi_korr)
+end_zeit = time.perf_counter()
+print(f"Berechnungszeit: {end_zeit - start_zeit:.2f} Sekunden")
+

@@ -2,7 +2,7 @@ import math
 from decimal import ROUND_FLOOR, Decimal, getcontext
 
 
-iterations = 10000
+iterations = 6000
 getcontext().prec = int(iterations * 1.205) + 20
 r = Decimal(1)
 sn = 0
