@@ -2,12 +2,9 @@ import sys
 import time
 import argparse
 import concurrent.futures
-import os
 from tqdm import tqdm
 
 # USE: C:\Users\loren\AppData\Local\Programs\Python\Python313\python.exe pi_chudnovski.py -d 100000000 -o pi_1b.txt -v pi-billion.txt
-# OR: C:\Users\loren\AppData\Local\Programs\Python\Python313\python.exe corepython/pi_chudnovski.py -d 100000000 -o pi_1b.txt --fast
-# OR: C:\Users\loren\AppData\Local\Programs\Python\Python313\python.exe corepython/pi_chudnovski.py -d 100000000 -o pi_1b.txt --threads 8 --no-progress
 
 
 # required for Python 3.11 mybe?????
@@ -59,12 +56,7 @@ class ProgressTracker:
             self.pbar.update(self.count)
             self.count = 0
 
-def combine(left, right):
-    P1, Q1, T1 = left
-    P2, Q2, T2 = right
-    return P1 * P2, Q1 * Q2, T1 * Q2 + P1 * T2
-
-def bs(a, b, tracker=None):
+def bs(a, b, tracker):
     """
     Recursive Binary Splitting of the Chudnovsky series.
     Computes terms from index 'a' to 'b-1'.
@@ -76,8 +68,7 @@ def bs(a, b, tracker=None):
         P = 5 - 46*a + 108*a2 - 72*a3
         Q = C1_int * a3
         T = P * (C2_int + C3_int * a)
-        if tracker:
-            tracker.advance(1)
+        tracker.advance(1)
         return mpz(P), mpz(Q), mpz(T)
     elif diff == 2:
         # Node 1
@@ -99,9 +90,8 @@ def bs(a, b, tracker=None):
         P = P1 * P2
         Q = Q1 * Q2
         T = T1 * Q2 + P1 * T2
-
-        if tracker:
-            tracker.advance(2)
+        
+        tracker.advance(2)
         return mpz(P), mpz(Q), mpz(T)
         
     m = (a + b) // 2
@@ -113,59 +103,30 @@ def bs(a, b, tracker=None):
     T = T1 * Q2 + P1 * T2
     return P, Q, T
 
-def bs_parallel(a, b, threads, pool):
-    total_terms = b - a
-    chunks = min(total_terms, max(1, threads * 4))
-    chunk_size = (total_terms + chunks - 1) // chunks
-
-    ranges = []
-    start = a
-    while start < b:
-        end = min(b, start + chunk_size)
-        ranges.append((start, end))
-        start = end
-
-    futures = [pool.submit(bs, start, end, None) for start, end in ranges]
-    results = [f.result() for f in futures]
-
-    P, Q, T = results[0]
-    for res in results[1:]:
-        P, Q, T = combine((P, Q, T), res)
-    return P, Q, T
-
-def calc_pi(digits, threads=1, show_progress=True):
+def calc_pi(digits):
     """Calculates Pi to the specified number of digits using Binary Splitting."""
     stats = {}
     
     D_calc = digits + 10
     
     N = int(D_calc / 14.181647462725477) + 1
-    threads = max(1, int(threads))
-    print(f"Target: {digits} digits | Guard digits: 10 | Series terms needed: {N} | Threads: {threads}")
+    print(f"Target: {digits} digits | Guard digits: 10 | Series terms needed: {N}")
     
     print("Launching massive square root calculation in background thread...")
     # Hide latency by running square root concurrently with binary splitting
-    max_workers = max(2, threads + 1)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         future_sqrt = pool.submit(lambda: isqrt(mpz(10005) * (mpz(10)**(2 * D_calc))))
-
+        
         start_time = time.time()
-        if N == 0:
-            Q, T = mpz(1), mpz(0)
-        elif threads == 1:
-            if show_progress:
-                update_freq = max(10000, N // 2000)
-                with tqdm(total=N, desc="Binary Splitting", unit=" terms") as pbar:
-                    tracker = ProgressTracker(pbar, update_freq=update_freq)
-                    _, Q, T = bs(1, N + 1, tracker)
-                    tracker.flush()
+        with tqdm(total=N, desc="Binary Splitting", unit=" terms") as pbar:
+            tracker = ProgressTracker(pbar)
+            if N == 0:
+                Q, T = mpz(1), mpz(0)
             else:
-                _, Q, T = bs(1, N + 1, None)
-        else:
-            _, Q, T = bs_parallel(1, N + 1, threads, pool)
-
+                _, Q, T = bs(1, N + 1, tracker)
+                tracker.flush()
         stats['bs_time'] = time.time() - start_time
-
+        
         print("Retrieving enormous square root (waiting if not finished)...")
         wait_start = time.time()
         sqrt_val = future_sqrt.result()
@@ -181,10 +142,7 @@ def calc_pi(digits, threads=1, show_progress=True):
     
     print("Converting large integer to string representation....")
     start_time = time.time()
-    if HAS_GMP:
-        pi_str_full = pi_int.digits(10)
-    else:
-        pi_str_full = str(pi_int)
+    pi_str_full = str(pi_int)
     pi_str = pi_str_full[0] + "." + pi_str_full[1:digits+1]
     stats['str_time'] = time.time() - start_time
     
@@ -231,25 +189,11 @@ def main():
                         help="Optional: Path to a reference .txt file containing Pi for validation.")
     parser.add_argument("-o", "--output", type=str, default="pi_output.txt", 
                         help="Path to save the calculated digits of Pi.")
-    parser.add_argument("--threads", type=int, default=1,
-                        help="Worker threads for binary splitting (1 = no parallelism).")
-    parser.add_argument("--no-progress", action="store_true",
-                        help="Disable the tqdm progress bar to reduce overhead.")
-    parser.add_argument("--fast", action="store_true",
-                        help="Shortcut: use all CPU threads and disable progress output.")
     args = parser.parse_args()
 
     total_start = time.time()
-
-    threads = args.threads
-    show_progress = not args.no_progress
-    if args.fast:
-        threads = os.cpu_count() or 1
-        show_progress = False
-    if threads < 1:
-        threads = 1
-
-    pi_str, stats = calc_pi(args.digits, threads=threads, show_progress=show_progress)
+    
+    pi_str, stats = calc_pi(args.digits)
     
     write_start = time.time()
     print(f"Saving output to '{args.output}'...")
