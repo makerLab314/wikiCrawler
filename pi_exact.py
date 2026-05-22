@@ -1,9 +1,9 @@
 from decimal import Decimal, getcontext
 
 # Wir zwingen Python, mit 1000 Nachkommastellen Genauigkeit zu rechnen
-getcontext().prec = 1000 
+getcontext().prec = 100000
 
-iterations = 35
+iterations = 3500
 
 # Alle Startwerte müssen zu "Decimal" gemacht werden, sonst nutzt Python wieder normale Floats
 r = Decimal('1') 

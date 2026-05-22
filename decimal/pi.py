@@ -34,7 +34,7 @@ loop = tqdm(range(iterations), desc="Calculating Pi", unit="iter")
 
 
 
-for i in range(iterations):
+for i in loop:
     seiten = seiten * Decimal(2)
     answ = sn / Decimal(2)
     nb = answ**2
@@ -43,13 +43,13 @@ for i in range(iterations):
     sn = (Decimal(2) - nb).sqrt()
     tot_iterations_debug = seiten
     pi = sn * tot_iterations_debug / Decimal(2)
-    finale_abweichung = abs(control_pi_decimal - pi)
+    # finale_abweichung = abs(control_pi_decimal - pi)
     # korrekte_stellen = -int(finale_abweichung.log10().to_integral_value(rounding=ROUND_FLOOR))
     
     # Eine schöne Ausgabe für jede Iteration:
     # print(f"Zwischenergebis: {korrekte_stellen} korrekte Stellen")
-    print("-" * 30)
-    print(f"Iteration {i + 1}:")
+    # print("-" * 30)
+    # print(f"Iteration {i + 1}:")
  
 
 pi = sn * tot_iterations
