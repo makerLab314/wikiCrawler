@@ -7,7 +7,7 @@ import gmpy2
 start_zeit = time.perf_counter()
 
 
-iterations = 10000
+iterations = 3000
 
 gmpy2.get_context().precision = int((int(iterations * 1.205) + 20) * 3.322) + 1
 
